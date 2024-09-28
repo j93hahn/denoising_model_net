@@ -1,5 +1,3 @@
-#### My readme file
-
 ### At submission time, delete the other `README.md` file and rename this to that.
 
 
@@ -16,6 +14,8 @@ I don't anticipate there being any hiccups here, except for open3D, which isn't 
 Now, download ModelNet40 and unzip it into this directory (`denoising_model_net/`) with:
 ```
 wget http://modelnet.cs.princeton.edu/ModelNet40.zip
+unzip ModelNet40.zip
+rm ModelNet40.zip
 ```
 
 Finally, try:
