@@ -1,1 +1,5 @@
 open3d
+numpy
+torch
+torchvision
+tqdm
