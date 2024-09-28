@@ -1,16 +1,28 @@
 from __future__ import annotations
 
-from pathlib import Path
-import os.path as osp
+import numpy as np
 import open3d as o3d
 
 
 class OFFObject:
-    def __init__(self, vertices: list[list[float]], faces: list[list[int]]):
+    def __init__(self, vertices: np.ndarray, faces: np.ndarray, include_faces: bool=False):
         self.vertices = vertices
-        self.faces = faces
+        if include_faces:
+            # for 90% of our use cases, we only need the point cloud vertices
+            self.faces = faces
 
-    def viz(self):
+    def viz_point_cloud(self):
+        pcd = o3d.geometry.PointCloud()
+        pcd.points = o3d.utility.Vector3dVector(self.vertices)
+        o3d.visualization.draw_geometries([pcd])
+
+    def viz_mesh(self):
+        if not hasattr(self, 'faces'):
+            # there are tools such as Poisson reconstruction which can
+            # generate the faces, but I observe bad performance here and
+            # choose to not include it
+            return
+
         mesh = o3d.geometry.TriangleMesh()
         mesh.vertices = o3d.utility.Vector3dVector(self.vertices)
         mesh.triangles = o3d.utility.Vector3iVector(self.faces)
@@ -44,18 +56,55 @@ class OFFObject:
         vertices, faces = [], []
         for line in lines[start_idx:start_idx + num_vertices]:
             vertices.append(list(map(float, line.split())))
+        vertices = np.array(vertices, dtype=float)
 
         for line in lines[start_idx + num_vertices:]:
             # index [1:] to skip the number of vertices in the face (always 3)
             faces.append(list(map(int, line.split()))[1:])
+        faces = np.array(faces, dtype=int)
 
         assert num_faces == len(faces), \
             'Number of faces does not match the number of faces in the file'
 
-        return OFFObject(vertices, faces)
+        return OFFObject(vertices, faces, include_faces=True)
+
+    def noise(self, std: float) -> OFFObject:
+        """
+        Adds noise directly to the vertices of the object. The noise is sampled
+        from a normal distribution with mu = 0 and std = std.
+        """
+        corrupted_vertices = self.vertices + np.random.normal(0, std, self.vertices.shape)
+        return OFFObject(corrupted_vertices, self.faces, include_faces=True)
+
+    def occlude(self, ratio: float) -> OFFObject:
+        """
+        Selects a random point in the object, and removes the closest points
+        to that point. The algorithm is simple: for each vertex, calculate its
+        distance to ground zero; we take the arg indices of the sorted distances
+        in an increasing order and remove the first ratio * len(self) vertices.
+        """
+        ground_zero = self.vertices[np.random.choice(len(self.vertices))]
+        distances = np.linalg.norm(self.vertices - ground_zero, axis=1)
+        occluded_indices = np.argsort(distances)[:int(ratio * len(self))]
+        occluded_vertices = np.delete(self.vertices, occluded_indices, axis=0)
+        return OFFObject(occluded_vertices, self.faces)
+
+    def __len__(self):
+        return len(self.vertices)
+
+    def __repr__(self):
+        return f'OFFObject with {len(self)} vertices'
 
 
 if __name__ == '__main__':
-    file = osp.abspath('data/tetra.off')
+    file = 'ModelNet40/airplane/test/airplane_0627.off'
     obj = OFFObject.read_off_file(file)
-    obj.viz()
+    obj.viz_mesh()
+    obj.viz_point_cloud()
+
+    noised_obj = obj.noise(10.0)
+    noised_obj.viz_mesh()
+    noised_obj.viz_point_cloud()
+
+    occluded_obj = obj.occlude(0.5)
+    occluded_obj.viz_point_cloud()
