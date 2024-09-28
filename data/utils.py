@@ -56,12 +56,12 @@ class OFFObject:
         vertices, faces = [], []
         for line in lines[start_idx:start_idx + num_vertices]:
             vertices.append(list(map(float, line.split())))
-        vertices = np.array(vertices, dtype=float)
+        vertices = np.array(vertices, dtype=np.float32)
 
         for line in lines[start_idx + num_vertices:]:
             # index [1:] to skip the number of vertices in the face (always 3)
             faces.append(list(map(int, line.split()))[1:])
-        faces = np.array(faces, dtype=int)
+        faces = np.array(faces, dtype=np.int32)
 
         assert num_faces == len(faces), \
             'Number of faces does not match the number of faces in the file'
