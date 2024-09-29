@@ -5,7 +5,8 @@ import open3d as o3d
 
 
 class OFFObject:
-    def __init__(self, vertices: np.ndarray, faces: np.ndarray, include_faces: bool=False):
+    def __init__(self, file_path: str, vertices: np.ndarray, faces: np.ndarray, include_faces: bool=False):
+        self.file_path = file_path
         self.vertices = vertices
         if include_faces:
             # for 90% of our use cases, we only need the point cloud vertices
@@ -66,7 +67,17 @@ class OFFObject:
         assert num_faces == len(faces), \
             'Number of faces does not match the number of faces in the file'
 
-        return OFFObject(vertices, faces, include_faces=True)
+        return OFFObject(file, vertices, faces, include_faces=True)
+
+    def write_off_file(self):
+        """
+        Save the point cloud only as a .ply file. This is useful for
+        visualization purposes.
+        """
+        with open(f'{self.file_path.removesuffix(".off")}.ply', 'w') as f:
+            f.write(f'num vertices {len(self.vertices)}\n')
+            for vertex in self.vertices:
+                f.write(f'{vertex[0]} {vertex[1]} {vertex[2]}\n')
 
     def noise(self, std: float) -> OFFObject:
         """
@@ -74,7 +85,7 @@ class OFFObject:
         from a normal distribution with mu = 0 and std = std.
         """
         corrupted_vertices = self.vertices + np.random.normal(0, std, self.vertices.shape)
-        return OFFObject(corrupted_vertices, self.faces, include_faces=True)
+        return OFFObject(self.file_path, corrupted_vertices, self.faces, include_faces=True)
 
     def occlude(self, ratio: float) -> OFFObject:
         """
@@ -87,7 +98,7 @@ class OFFObject:
         distances = np.linalg.norm(self.vertices - ground_zero, axis=1)
         occluded_indices = np.argsort(distances)[:int(ratio * len(self))]
         occluded_vertices = np.delete(self.vertices, occluded_indices, axis=0)
-        return OFFObject(occluded_vertices, self.faces)
+        return OFFObject(self.file_path, occluded_vertices, self.faces)
 
     def __len__(self):
         return len(self.vertices)
